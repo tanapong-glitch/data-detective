@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="th" class="h-full">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>นักสืบข้อมูล: จากความสงสัยสู่ความรู้</title>
+<!-- Google Fonts & Tailwind CSS CDN -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700;800&family=Sarabun:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<!-- Canvas Confetti Library -->
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['Prompt', 'Sarabun', 'sans-serif'],
+        },
+        colors: {
+          detective: {
+            yellow: '#FFCB3D',
+            darkYellow: '#E5B127',
+            blue: '#2B6CB0',
+            darkBlue: '#0F172A',
+            cardBg: '#FFFFFF',
+            cardBgDark: '#1E293B',
+            accentOk: '#10B981',
+            accentNo: '#EF4444',
+            accentMid: '#F59E0B'
+          }
+        }
+      }
+    }
+  }
+</script>
+
+<style>
+  :root {
+    --app-bg: #EBF8FF;
+    --card-border: #1E293B;
+  }
+  .dark {
+    --app-bg: #0F172A;
+    --card-border: #94A3B8;
+  }
+  
+  body {
+    background-color: var(--app-bg);
+    transition: background-color 0.3s ease;
+    font-family: 'Prompt', sans-serif;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Retro Brutalism UI Box Shadow */
+  .neo-shadow {
+    box-shadow: 4px 4px 0px 0px rgba(15, 23, 42, 1);
+  }
+  .dark .neo-shadow {
+    box-shadow: 4px 4px 0px 0px rgba(255, 255, 255, 0.85);
+  }
+
+  .neo-shadow-sm {
+    box-shadow: 2px 2px 0px 0px rgba(15, 23, 42, 1);
+  }
+  .dark .neo-shadow-sm {
+    box-shadow: 2px 2px 0px 0px rgba(255, 255, 255, 0.85);
+  }
+
+  /* Interactive Button Presses */
+  .btn-press:active {
+    transform: translate(2px, 2px);
+    box-shadow: 1px 1px 0px 0px rgba(15, 23, 42, 1) !important;
+  }
+
+  /* Custom Stamp Animation */
+  .stamp-anim {
+    animation: stampIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  }
+
+  @keyframes stampIn {
+    0% { transform: scale(3) rotate(-15deg); opacity: 0; }
+    100% { transform: scale(1) rotate(-4deg); opacity: 1; }
+  }
+
+  /* Pulse highlight */
+  .pulse-border {
+    animation: pulseBorder 1.5s infinite alternate;
+  }
+  @keyframes pulseBorder {
+    0% { border-color: #FFCB3D; }
+    100% { border-color: #3B82F6; }
+  }
+</style>
+</head>
+<body class="min-h-full flex flex-col justify-between antialiased">
+
+  <!-- Audio Effects via Web Audio API -->
+  <script>
+    const AudioEngine = {
+      ctx: null,
+      init() {
+        if (!this.ctx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) this.ctx = new AudioCtx();
+        }
+      },
+      playTone(freq, type, duration, delay = 0) {
+        if (!this.ctx) return;
+        setTimeout(() => {
+          try {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+            gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start();
+            osc.stop(this.ctx.currentTime + duration);
+          } catch(e){}
+        }, delay);
+      },
+      click() {
+        this.init();
+        this.playTone(400, 'sine', 0.05);
+      },
+      correct() {
+        this.init();
+        this.playTone(523.25, 'triangle', 0.1, 0);   // C5
+        this.playTone(659.25, 'triangle', 0.1, 80);  // E5
+        this.playTone(783.99, 'triangle', 0.2, 160); // G5
+      },
+      wrong() {
+        this.init();
+        this.playTone(220, 'sawtooth', 0.15, 0);   // A3
+        this.playTone(207.65, 'sawtooth', 0.25, 100); // G#3
+      },
+      neutral() {
+        this.init();
+        this.playTone(349.23, 'sine', 0.1, 0);
+        this.playTone(392.00, 'sine', 0.15, 80);
+      },
+      win() {
+        this.init();
+        [523.25, 659.25, 783.99, 1046.50].forEach((f, i) => {
+          this.playTone(f, 'triangle', 0.2, i * 100);
+        });
+      }
+    };
+  </script>
+
+  <!-- Theme Toggle Floating Button -->
+  <div class="fixed top-4 right-4 z-50">
+    <button id="themeToggleBtn" onclick="toggleTheme()" class="bg-white dark:bg-slate-800 text-slate-900 dark:text-yellow-400 p-2.5 rounded-xl border-2 border-slate-900 dark:border-slate-300 neo-shadow-sm font-bold flex items-center justify-center transition-all">
+      <span id="themeIcon">🌙</span>
+    </button>
+  </div>
+
+  <!-- Main Container -->
+  <div class="w-full max-w-lg mx-auto px-4 py-4 flex-grow flex flex-col justify-center" id="app"></div>
+
+  <!-- App Script Logic -->
+  <script>
+    // Data Sets
+    const R1 = [
+      ["นอนน้อยทำให้เรียนรู้และจดจำได้แย่ลง", 0, "ระหว่างหลับสมองจัดเก็บความทรงจำ งานวิจัยจำนวนมากพบตรงกันว่าการอดนอนทำให้จำและมีสมาธิแย่ลง"],
+      ["การเล่นโทรศัพท์ก่อนนอนทำให้นอนหลับยากขึ้น", 0, "แสงจอและเนื้อหาที่กระตุ้นทำให้หลับช้าลง มีงานวิจัยหลายชิ้นพบความสัมพันธ์นี้ แต่ผลของแต่ละคนไม่เท่ากัน"],
+      ["บะหมี่กึ่งสำเร็จรูปทำให้เกิดสิว", 1, "ยังไม่มีหลักฐานโดยตรงว่าบะหมี่กึ่งสำเร็จรูปทำให้เกิดสิว สิวเกี่ยวข้องกับฮอร์โมน พันธุกรรม และความมันของผิวมากกว่า"],
+      ["ดื่มกาแฟแล้วหายง่วงทุกคน", 1, "คาเฟอีนช่วยให้หายง่วงในหลายคน แต่ผลต่างกันตามพันธุกรรมและความเคยชิน คำว่า “ทุกคน” เป็นสัญญาณเตือนของนักสืบ"],
+      ["เราใช้สมองเพียง 10% ของทั้งหมด", 1, "ภาพสแกนสมองพบว่าเราใช้สมองเกือบทุกส่วนตลอดวัน ไม่ใช่แค่ 10%"],
+      ["ฟ้าไม่ผ่าที่เดิมซ้ำสอง", 1, "ฟ้าผ่าที่เดิมซ้ำได้ ตึกสูงอย่างเอ็มไพร์สเตทถูกฟ้าผ่าหลายครั้งต่อปี"],
+      ["การโกนขนทำให้เส้นขนขึ้นมาหนาขึ้น", 1, "การโกนตัดแค่ปลายเส้นขน ปลายที่ถูกตัดจึงรู้สึกหยาบ แต่ความหนาและสีของเส้นขนไม่เปลี่ยน"],
+      ["ล้างมือด้วยสบู่ช่วยลดการแพร่เชื้อโรค", 0, "การฟอกสบู่ให้ทั่วมือประมาณ 20 วินาทีช่วยล้างเชื้อออก มีหลักฐานจากองค์กรสาธารณสุขทั่วโลก"]
+    ];
+
+    const R2 = [
+      ["ข้อความ “ดื่มน้ำมะนาวอุ่นตอนเช้าช่วยลดไขมันหน้าท้อง” หลักฐานแบบไหนน่าเชื่อถือที่สุด?", ["เพื่อนในกลุ่มแชทบอกว่าลองแล้วได้ผล", "โพสต์ไวรัลที่มีคนแชร์ 50,000 ครั้ง", "งานวิจัยทดลองในคนจำนวนมาก ตีพิมพ์ในวารสารวิชาการ", "ดาราคนดังพูดในรายการ"], 2, "งานวิจัยที่ออกแบบการทดลองชัดเจนและผ่านการตรวจโดยผู้เชี่ยวชาญ น่าเชื่อกว่าคำบอกเล่า ยอดแชร์ หรือชื่อเสียงของคนพูด"],
+      ["แหล่งไหนเหมาะที่สุดสำหรับตรวจว่ายาชนิดหนึ่งปลอดภัยหรือไม่?", ["เว็บไซต์ที่ขายยาตัวนั้น", "กระทู้ในเว็บบอร์ด", "เว็บไซต์ของ อย. หรือองค์การอนามัยโลก", "คลิปรีวิวจากอินฟลูเอนเซอร์"], 2, "หน่วยงานด้านสุขภาพมีหน้าที่ตรวจสอบและไม่ได้ขายสินค้า จึงเป็นแหล่งที่น่าเชื่อถือที่สุด"],
+      ["เพื่อนบอกว่าเรื่องนี้จริงเพราะ “ใครๆ ก็รู้กัน” คุณควรทำอย่างไร?", ["เชื่อเลย เพราะคนรู้กันเยอะ", "ถามว่ารู้มาจากไหน แล้วหาข้อมูลมายืนยัน", "เมินไปเลย", "แชร์ต่อก่อน ค่อยตรวจทีหลัง"], 1, "คนส่วนมากเชื่อไม่ได้แปลว่าจริง ถามที่มาแล้วตรวจสอบเป็นวิธีของนักสืบ"],
+      ["ข้อไหนเป็น “ข้อเท็จจริง” ที่ตรวจสอบได้?", ["ข้าวกล่องร้านนี้อร่อยที่สุด", "น้ำบริสุทธิ์เดือดที่ 100 องศาเซลเซียส ที่ระดับน้ำทะเล", "การเรียนออนไลน์น่าเบื่อ", "หนังเรื่องนี้ต้องดู"], 1, "ข้อเท็จจริงวัดหรือพิสูจน์ได้ ส่วน “อร่อยที่สุด” “น่าเบื่อ” “ต้องดู” เป็นความเห็น"],
+      ["อยากรู้ว่าข่าวหนึ่งจริงหรือไม่ ควรทำอะไรก่อน?", ["ดูว่าสำนักข่าวหรือหน่วยงานที่เชื่อถือได้รายงานตรงกันไหม", "นับจำนวนไลก์", "ดูว่ารูปประกอบสวยไหม", "ถามคนที่แชร์ว่าเชื่อไหม"], 0, "ข้อมูลที่จริงมักมีหลายแหล่งที่เชื่อถือได้รายงานตรงกัน ไลก์และความสวยพิสูจน์ความจริงไม่ได้"]
+    ];
+
+    const R3 = [
+      { h: "ด่วน! ดื่มน้ำเกลือ 3 แก้วหายป่วยทุกโรค", c: [["ผู้เขียน", "เพจไม่ระบุตัวตน"], ["แหล่งอ้างอิง", "ไม่มี"], ["จุดประสงค์", "ท้ายโพสต์มีลิงก์ขายผลิตภัณฑ์"], ["วันที่", "ไม่ระบุ"]], a: 2, e: "ไม่มีผู้รับผิดชอบ ไม่มีหลักฐาน อ้างว่ารักษาได้ “ทุกโรค” และมีเป้าหมายขายของ ครบทุกสัญญาณอันตราย" },
+      { h: "งานวิจัยพบ นักเรียนที่นอนไม่พอมีคะแนนสอบต่ำลง", c: [["ผู้เขียน", "ทีมวิจัยจากมหาวิทยาลัย ระบุชื่อชัดเจน"], ["แหล่งอ้างอิง", "ตีพิมพ์ในวารสารวิชาการ ระบุกลุ่มตัวอย่าง"], ["จุดประสงค์", "เผยแพร่ความรู้ ไม่มีการขายสินค้า"], ["วันที่", "เมื่อ 2 ปีที่แล้ว"]], a: 0, e: "ผู้เขียนตรวจสอบได้ มีแหล่งอ้างอิงและวิธีวิจัยชัดเจน ไม่มีผลประโยชน์ทางการค้า น่าเชื่อถือสูง" },
+      { h: "เจอแล้ว! ผลไม้ชนิดนี้ป้องกันมะเร็งได้", c: [["ผู้เขียน", "บล็อกเกอร์สายสุขภาพ มีผู้ติดตามมาก"], ["แหล่งอ้างอิง", "อ้างงานทดลองในห้องแล็บกับเซลล์ ไม่ใช่การทดลองในคน"], ["จุดประสงค์", "รีวิวพร้อมแนะนำสินค้า"], ["วันที่", "เมื่อวาน"]], a: 1, e: "ผลในห้องแล็บยังสรุปไม่ได้ว่าได้ผลในคน และมีผลประโยชน์จากการขายสินค้า ต้องตรวจสอบกับแหล่งทางการแพทย์ก่อน" },
+      { h: "ประกาศ: โรงเรียนหยุด 3 วัน เพราะน้ำท่วม", c: [["ผู้เขียน", "ส่งต่อมาในกลุ่มแชท ไม่ทราบต้นทาง"], ["แหล่งอ้างอิง", "ไม่มีลิงก์หรือหนังสือทางการ"], ["จุดประสงค์", "แจ้งข่าว"], ["วันที่", "ไม่ระบุ"]], a: 1, e: "ข่าวอาจจริง แต่ไม่รู้ที่มา ควรตรวจกับเพจหรือประกาศทางการของโรงเรียนก่อนตัดสินใจ" }
+    ];
+
+    const SC = {
+      A: ["นักเรียนที่เล่นโทรศัพท์ก่อนนอนจะเรียนได้แย่ลง", [
+        ["ข้อไหนเป็นประเด็นสงสัยที่ตรวจสอบได้ดีที่สุด?", ["โทรศัพท์เป็นสิ่งไม่ดีใช่ไหม", "คนที่เล่นโทรศัพท์ก่อนนอนเกิน 1 ชั่วโมง มีเวลานอนและคะแนนสอบต่างจากคนที่ไม่เล่นหรือไม่", "ทำไมเด็กสมัยนี้ติดโทรศัพท์"], 1, "คำถามที่ดีระบุสิ่งที่วัดได้และเปรียบเทียบสองกลุ่มชัดเจน"],
+        ["ถ้าสมมติฐานถูก เราควรเห็นผลแบบไหน?", ["กลุ่มที่เล่นก่อนนอนมีเวลานอนและคะแนนต่ำกว่า", "ทุกคนที่เล่นโทรศัพท์สอบตก", "ครูเห็นด้วยกับสมมติฐาน"], 0, "ผลที่คาดต้องวัดได้ และพิสูจน์ได้ว่าผิดได้ถ้าไม่เป็นอย่างนั้น"],
+        ["ต้องหาข้อมูลอะไร?", ["เวลานอน เวลาที่เริ่มเล่น และผลสอบของนักเรียนทั้งสองกลุ่ม", "จำนวนผู้ติดตามของคนที่โพสต์เรื่องนี้", "ราคาของโทรศัพท์"], 0, "ข้อมูลที่ต้องหาคือสิ่งที่ตอบคำถามได้โดยตรง"]
+      ]],
+      B: ["การฟังเพลงขณะอ่านหนังสือช่วยให้จำเนื้อหาได้ดีขึ้น", [
+        ["ข้อไหนเป็นประเด็นสงสัยที่ตรวจสอบได้ดีที่สุด?", ["เพลงไหนเพราะที่สุด", "การฟังเพลงขณะอ่านทำให้จำเนื้อหาต่างจากการอ่านเงียบๆ หรือไม่", "ควรเลิกฟังเพลงไหม"], 1, "ประเด็นที่ดีเปรียบเทียบสองเงื่อนไขและวัดผลได้"],
+        ["ถ้าสมมติฐานถูก เราควรเห็นผลแบบไหน?", ["คะแนนทดสอบความจำของสองกลุ่มต่างกันอย่างวัดได้", "ทุกคนชอบฟังเพลง", "เพลงช้าดีกว่าเพลงเร็วเสมอ"], 0, "ผลที่คาดต้องเชื่อมกับสิ่งที่สงสัยโดยตรง และคำว่า “เสมอ” เป็นสัญญาณเตือน"],
+        ["ต้องหาข้อมูลอะไร?", ["คะแนนทดสอบความจำหลังอ่านบทเดียวกัน ของกลุ่มฟังเพลงกับกลุ่มอ่านเงียบ", "ยอดวิวเพลงในยูทูบ", "จำนวนเพลงในโทรศัพท์"], 0, "ใช้เนื้อหาเดียวกันและวัดคะแนนด้วยแบบทดสอบเดียวกัน จึงเปรียบเทียบได้ยุติธรรม"]
+      ]],
+      C: ["นักเรียนที่กินอาหารเช้าจะมีสมาธิในการเรียนมากกว่า", [
+        ["ข้อไหนเป็นประเด็นสงสัยที่ตรวจสอบได้ดีที่สุด?", ["อาหารเช้าอร่อยไหม", "นักเรียนที่กินอาหารเช้ามีสมาธิในคาบเช้ามากกว่านักเรียนที่ไม่กินหรือไม่", "ทำไมต้องกินข้าว"], 1, "คำถามที่ดีระบุกลุ่มที่เทียบกันและสิ่งที่วัดได้"],
+        ["ถ้าสมมติฐานถูก เราควรเห็นผลแบบไหน?", ["กลุ่มที่กินอาหารเช้าทำแบบทดสอบสมาธิได้คะแนนสูงกว่า", "ทุกคนที่กินข้าวจะสอบได้ที่ 1", "ครูจะชมนักเรียน"], 0, "ผลที่คาดต้องวัดได้และเฉพาะเจาะจงกับสิ่งที่สงสัย"],
+        ["ต้องหาข้อมูลอะไร?", ["ผลแบบทดสอบสมาธิคาบเช้า ว่ากินอาหารเช้าหรือไม่ และชั่วโมงนอนที่อาจทำให้ผลปนกัน", "ราคาข้าวเช้า", "เมนูโปรดของนักเรียน"], 0, "ควรเก็บปัจจัยอื่นอย่างเวลานอนด้วย เพราะอาจทำให้ผลที่เห็นไม่ได้มาจากอาหารเช้าอย่างเดียว"]
+      ]]
+    };
+
+    const ROUNDS = [
+      { n: "ด่าน 1: จริง หรือ มั่ว?", d: "ตัดสินข้อความตามที่คุณเชื่อ แล้วดูว่าหลักฐานบอกอะไร ตอบถูกได้ 10 คะแนน เลือก “ไม่แน่ใจ” ได้ 3 คะแนน เพราะการยอมรับว่ายังไม่รู้ก็เป็นทักษะของนักสืบ", items: R1.map(([q, a, e]) => ({ k: "tf", q, a, e })) },
+      { n: "ด่าน 2: หยุดก่อน! ทำไมถึงคิดแบบนั้น?", d: "ข้อมูลแต่ละชิ้นน่าเชื่อไม่เท่ากัน เลือกหลักฐานและวิธีคิดที่น่าเชื่อถือที่สุด ข้อละ 10 คะแนน", items: R2.map(([q, o, a, e]) => ({ k: "mc", q, o, a, e })) },
+      { n: "ด่าน 3: ตรวจเบาะแสข่าว", d: "เปิดเบาะแสทั้ง 4 ข้อของแต่ละข่าว แล้วตัดสินว่าจะเชื่อได้ไหม ข้อละ 15 คะแนน", items: R3.map(x => ({ k: "src", ...x })) },
+      { n: "ด่าน 4: ภารกิจนักสืบข้อมูล", d: "เลือกสถานการณ์ที่สนใจ 1 ข้อ แล้วตอบคำถามของนักสืบ 3 ขั้น ขั้นละ 15 คะแนน", items: [{ k: "pick" }] },
+      { n: "ด่าน 5: Challenge คำถามของกลุ่ม", d: "ตั้งประเด็นและคำถามที่อยากค้นหาคำตอบเอง กรอกครบทั้งสองช่องรับโบนัส 15 คะแนน", items: [{ k: "w" }] }
+    ];
+
+    const TOTAL = 22;
+    const $ = s => document.querySelector(s);
+    const app = $("#app");
+    const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c]));
+    const shuffle = a => {
+      a = a.slice();
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    };
+
+    let S = { ph: "name" }, best = 0, savedName = "";
+
+    try {
+      const d = JSON.parse(localStorage.getItem("data_detective_game") || "{}");
+      best = d.b || 0;
+      savedName = d.n || "";
+    } catch (x) {}
+
+    const cur = () => ROUNDS[S.ri] ? ROUNDS[S.ri].items[S.ii] : null;
+
+    // Theme Management
+    function toggleTheme() {
+      AudioEngine.click();
+      const html = document.documentElement;
+      if (html.classList.contains('dark')) {
+        html.classList.remove('dark');
+        $('#themeIcon').textContent = '🌙';
+        localStorage.setItem('theme', 'light');
+      } else {
+        html.classList.add('dark');
+        $('#themeIcon').textContent = '☀️';
+        localStorage.setItem('theme', 'dark');
+      }
+    }
+
+    // Init Theme Preference
+    if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      document.documentElement.classList.add('dark');
+      setTimeout(() => { if($('#themeIcon')) $('#themeIcon').textContent = '☀️'; }, 0);
+    }
+
+    function renderHeader() {
+      const pct = Math.min(100, Math.round((S.done / TOTAL) * 100));
+      return `
+        <header class="mb-4">
+          <div class="flex justify-between items-center mb-1.5">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              ${ROUNDS[S.ri] ? ROUNDS[S.ri].n : "สรุปผลคดี"}
+            </span>
+            <span class="bg-amber-400 text-slate-900 font-extrabold px-3 py-1 rounded-xl text-sm border-2 border-slate-900 neo-shadow-sm flex items-center gap-1">
+              ⭐ ${S.score} <small class="text-xs text-slate-700">คะแนน</small>
+            </span>
+          </div>
+          <div class="w-full bg-slate-200 dark:bg-slate-700 h-3.5 rounded-full border-2 border-slate-900 dark:border-slate-300 overflow-hidden relative">
+            <div class="bg-amber-400 h-full transition-all duration-500 ease-out" style="width: ${pct}%"></div>
+          </div>
+        </header>
+      `;
+    }
+
+    function renderOptBtn(label, index, correctIdx, isTrueFalse) {
+      let stateClass = "bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border-slate-900 dark:border-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700";
+      
+      if (S.fb) {
+        if (index === correctIdx) {
+          stateClass = "bg-emerald-100 dark:bg-emerald-950/80 text-emerald-900 dark:text-emerald-200 border-emerald-600 dark:border-emerald-400 font-bold";
+        } else if (index === S.sel) {
+          if (isTrueFalse && S.sel === 2) {
+            stateClass = "bg-amber-100 dark:bg-amber-950/80 text-amber-900 dark:text-amber-200 border-amber-500 dark:border-amber-400 font-bold";
+          } else {
+            stateClass = "bg-rose-100 dark:bg-rose-950/80 text-rose-900 dark:text-rose-200 border-rose-600 dark:border-rose-400";
+          }
+        } else {
+          stateClass = "opacity-40 bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-400";
+        }
+      }
+
+      return `
+        <button 
+          ${S.fb ? 'disabled' : ''} 
+          onclick="pickOption(${index})" 
+          class="w-full text-left font-semibold text-base py-3 px-4 my-2 rounded-xl border-2 neo-shadow-sm transition-all btn-press flex items-center justify-between ${stateClass}">
+          <span>${label}</span>
+          ${S.fb && index === correctIdx ? '<span>✓</span>' : ''}
+          ${S.fb && index === S.sel && index !== correctIdx && !(isTrueFalse && index===2) ? '<span>✗</span>' : ''}
+        </button>
+      `;
+    }
+
+    function renderFeedbackBox() {
+      const item = cur();
+      const isMid = item.k === "tf" && S.sel === 2;
+      
+      let boxBg = S.ok 
+        ? "bg-emerald-50 dark:bg-emerald-950/50 border-emerald-500 text-emerald-900 dark:text-emerald-200" 
+        : (isMid 
+          ? "bg-amber-50 dark:bg-amber-950/50 border-amber-500 text-amber-900 dark:text-amber-200" 
+          : "bg-rose-50 dark:bg-rose-950/50 border-rose-500 text-rose-900 dark:text-rose-200");
+      
+      let stampText = S.ok ? "ถูกต้อง!" : (isMid ? "ซื่อสัตย์ดีมาก" : "ยังไม่ถูกต้อง");
+      let stampColor = S.ok ? "border-emerald-600 text-emerald-600 dark:border-emerald-400 dark:text-emerald-400" : (isMid ? "border-amber-600 text-amber-600 dark:border-amber-400 dark:text-amber-400" : "border-rose-600 text-rose-600 dark:border-rose-400 dark:text-rose-400");
+
+      return `
+        <div class="mt-4 p-4 rounded-xl border-2 border-dashed ${boxBg} space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="inline-block px-3 py-1 font-black text-sm uppercase rounded-md border-2 stamp-anim ${stampColor}">
+              ${stampText}
+            </span>
+            <span class="font-bold text-sm bg-white dark:bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-900 dark:border-slate-300">
+              +${S.pts} คะแนน
+            </span>
+          </div>
+          <p class="text-sm leading-relaxed text-slate-800 dark:text-slate-200 font-medium">
+            ${item.e}
+          </p>
+        </div>
+        <button onclick="nextQuestion()" class="w-full mt-4 bg-amber-400 hover:bg-amber-300 text-slate-900 font-black text-lg py-3 rounded-xl border-2 border-slate-900 neo-shadow btn-press transition-all flex items-center justify-center gap-2">
+          <span>ไปต่อ</span> <span>➔</span>
+        </button>
+      `;
+    }
+
+    function render() {
+      let html = "";
+      const item = S.ph === "q" ? cur() : null;
+
+      if (S.ph === "name") {
+        html = `
+          <div class="bg-white dark:bg-slate-800 border-2 border-slate-900 dark:border-slate-200 rounded-2xl p-6 neo-shadow relative transition-all">
+            <div class="absolute -top-3.5 left-4 bg-amber-400 text-slate-900 text-xs font-black px-3 py-0.5 rounded-md border-2 border-slate-900 uppercase">
+              แฟ้มคดีลับ #001
+            </div>
+            <div class="text-center my-4">
+              <div class="text-5xl mb-2">🔍</div>
+              <h1 class="text-3xl font-black text-slate-900 dark:text-white tracking-tight">นักสืบข้อมูล</h1>
+              <p class="text-slate-600 dark:text-slate-300 text-sm mt-1">จากความสงสัย... สู่ความรู้ที่แท้จริง</p>
+            </div>
+            <p class="text-slate-700 dark:text-slate-300 text-sm mb-6 leading-relaxed bg-slate-50 dark:bg-slate-700/50 p-3.5 rounded-xl border border-slate-200 dark:border-slate-600">
+              เรียนรู้การแยกแยะข้อเท็จจริงออกจากข่าวลือ ข้อมูลมั่ว และใช้หลักฐานในการวิเคราะห์ ใช้เวลาประมาณ 20-30 นาที
+            </p>
+            <div class="space-y-4">
+              <div>
+                <label for="nm" class="block font-bold text-slate-800 dark:text-slate-200 text-sm mb-1">ชื่อรหัสประจำตัวนักสืบ</label>
+                <input id="nm" type="text" maxlength="30" value="${escapeHtml(savedName)}" placeholder="เช่น นักสืบโคนัน / สายสืบต้น" class="w-full px-4 py-3 rounded-xl border-2 border-slate-900 dark:border-slate-300 dark:bg-slate-900 dark:text-white font-medium focus:outline-none focus:ring-2 focus:ring-amber-400">
+              </div>
+              <button onclick="startGame()" class="w-full bg-amber-400 hover:bg-amber-300 text-slate-900 font-extrabold text-lg py-3.5 rounded-xl border-2 border-slate-900 neo-shadow btn-press transition-all">
+                เปิดแฟ้มภารกิจ ➔
+              </button>
+            </div>
+            ${best ? `<div class="mt-4 text-center text-xs font-semibold text-slate-500 dark:text-slate-400">🏆 สถิติตัวเองสูงสุด: ${best} คะแนน</div>` : ""}
+          </div>
+        `;
+      } 
+      else if (S.ph === "intro") {
+        const round = ROUNDS[S.ri];
+        html = renderHeader() + `
+          <div class="bg-white dark:bg-slate-800 border-2 border-slate-900 dark:border-slate-200 rounded-2xl p-6 neo-shadow space-y-4">
+            <span class="inline-block bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-200 text-xs font-extrabold px-3 py-1 rounded-lg border border-blue-300 dark:border-blue-700">
+              ด่านที่ ${S.ri + 1} จาก 5
+            </span>
+            <h2 class="text-2xl font-black text-slate-900 dark:text-white">${round.n}</h2>
+            <p class="text-slate-600 dark:text-slate-300 text-sm leading-relaxed bg-slate-50 dark:bg-slate-700/50 p-4 rounded-xl border border-slate-200 dark:border-slate-600">
+              ${round.d}
+            </p>
+            <button onclick="beginRound()" class="w-full bg-amber-400 hover:bg-amber-300 text-slate-900 font-extrabold text-lg py-3.5 rounded-xl border-2 border-slate-900 neo-shadow btn-press transition-all flex items-center justify-center gap-2">
+              <span>เริ่มตะลุยด่าน</span> <span>🚀</span>
+            </button>
+          </div>
+        `;
+      }
+      else if (S.ph === "end") {
+        html = renderEndView();
+      }
+      else {
+        // Question View
+        html = renderHeader() + `<div class="bg-white dark:bg-slate-800 border-2 border-slate-900 dark:border-slate-200 rounded-2xl p-5 neo-shadow transition-all relative">`;
+        
+        if (item.k === "tf") {
+          html += `
+            <div class="text-xs font-extrabold text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-2">ตรวจสอบข้อความ</div>
+            <p class="text-lg font-bold text-slate-900 dark:text-white leading-snug mb-4 bg-slate-50 dark:bg-slate-900/60 p-4 rounded-xl border-2 border-slate-200 dark:border-slate-700">
+              “${item.q}”
+            </p>
+            <div class="space-y-1">
+              ${["✓ จริง (มีหลักฐานรองรับ)", "✗ มั่ว / ความเชื่อผิดๆ", "? ไม่แน่ใจ (ขอตั้งหลักก่อน)"].map((t, i) => renderOptBtn(t, i, item.a, true)).join("")}
+            </div>
+            ${S.fb ? renderFeedbackBox() : ""}
+          `;
+        } 
+        else if (item.k === "mc") {
+          const headerTag = S.sc ? `สถานการณ์: ${SC[S.sc][0]}` : "คำถามสืบเบาะแส";
+          html += `
+            <div class="text-xs font-extrabold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1">${headerTag}</div>
+            <p class="text-base font-bold text-slate-900 dark:text-white mb-4">${item.q}</p>
+            <div class="space-y-1">
+              ${S.ord.map(idx => renderOptBtn(escapeHtml(item.o[idx]), idx, item.a, false)).join("")}
+            </div>
+            ${S.fb ? renderFeedbackBox() : ""}
+          `;
+        }
+        else if (item.k === "src") {
+          html += `
+            <div class="text-xs font-extrabold text-purple-600 dark:text-purple-400 uppercase tracking-wider mb-1">ข่าวที่ต้องตรวจสอบ</div>
+            <p class="text-lg font-bold text-slate-900 dark:text-white mb-4 bg-purple-50 dark:bg-purple-950/40 p-3.5 rounded-xl border-2 border-purple-200 dark:border-purple-800">
+              “${item.h}”
+            </p>
+            <div class="text-xs font-bold text-slate-500 dark:text-slate-400 mb-2">กดเพื่อเปิดตรวจเบาะแสให้ครบทั้ง 4 ข้อ:</div>
+            <div class="grid grid-cols-2 gap-2 mb-4">
+              ${item.c.map((clue, idx) => {
+                const isOpen = S.op.has(idx);
+                return `
+                  <button onclick="openClue(${idx})" class="p-2.5 text-left rounded-xl border-2 transition-all text-xs btn-press ${isOpen ? 'bg-amber-100 dark:bg-amber-900/40 border-amber-500 text-slate-900 dark:text-slate-100' : 'bg-slate-100 dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300'}">
+                    <span class="block font-bold ${isOpen ? 'text-amber-800 dark:text-amber-300' : 'text-slate-500'}">${clue[0]}</span>
+                    <span class="font-medium">${isOpen ? escapeHtml(clue[1]) : '🔒 แตะเพื่อตรวจ'}</span>
+                  </button>
+                `;
+              }).join("")}
+            </div>
+          `;
+
+          if (S.op.size < 4) {
+            html += `<p class="text-xs font-semibold text-center text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-700/50 py-2 rounded-lg">ตรวจเบาะแสให้ครบ (${S.op.size}/4) เพื่อปลดล็อกปุ่มตัดสิน</p>`;
+          } else {
+            html += `
+              <div class="border-t border-slate-200 dark:border-slate-700 pt-3">
+                <p class="text-xs font-extrabold text-slate-700 dark:text-slate-300 mb-2">คำตัดสินของคุณ:</p>
+                <div class="space-y-1">
+                  ${["เชื่อถือได้", "ควรตรวจสอบเพิ่มเติม", "ไม่ควรอ้างอิง / ไม่น่าเชื่อถือ"].map((t, i) => renderOptBtn(t, i, item.a, false)).join("")}
+                </div>
+              </div>
+            `;
+          }
+          if (S.fb) html += renderFeedbackBox();
+        }
+        else if (item.k === "pick") {
+          html += `
+            <div class="text-xs font-extrabold text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-2">ภารกิจเลือกเคสสืบสวน</div>
+            <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-3">เลือก 1 สถานการณ์ที่กลุ่มของคุณสนใจสืบสวน:</h3>
+            <div class="space-y-3">
+              ${Object.keys(SC).map(key => `
+                <button onclick="setScenario('${key}')" class="w-full text-left p-4 rounded-xl border-2 border-slate-900 dark:border-slate-300 bg-white dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-slate-700 neo-shadow-sm btn-press transition-all">
+                  <span class="inline-block bg-amber-400 text-slate-900 font-extrabold px-2 py-0.5 rounded text-xs mb-1">เคส ${key}</span>
+                  <p class="font-bold text-slate-900 dark:text-slate-100 text-sm leading-snug">${SC[key][0]}</p>
+                </button>
+              `).join("")}
+            </div>
+          `;
+        }
+        else if (item.k === "w") {
+          html += `
+            <div class="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-2">ภารกิจสุดท้าย</div>
+            <h3 class="text-lg font-bold text-slate-900 dark:text-white mb-2">ตั้งคำถามนักสืบของกลุ่ม</h3>
+            <p class="text-xs text-slate-600 dark:text-slate-300 mb-4">ลองตั้งประเด็นที่สงสัยในชีวิตประจำวันเพื่อนำไปหาคำตอบจริง!</p>
+            <div class="space-y-4">
+              <div>
+                <label for="t1" class="block font-bold text-slate-800 dark:text-slate-200 text-xs mb-1">1. ประเด็นที่กลุ่มสนใจสงสัย</label>
+                <textarea id="t1" rows="2" placeholder="เช่น การกินน้ำอุ่นช่วยให้หายป่วยเร็วขึ้นจริงไหม?" class="w-full p-3 rounded-xl border-2 border-slate-900 dark:border-slate-300 dark:bg-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"></textarea>
+              </div>
+              <div>
+                <label for="t2" class="block font-bold text-slate-800 dark:text-slate-200 text-xs mb-1">2. คำถามหรือสิ่งที่ต้องเก็บข้อมูลเพื่อพิสูจน์</label>
+                <textarea id="t2" rows="3" placeholder="เช่น เปรียบเทียบระยะเวลาหายป่วยระหว่างกลุ่มที่ดื่มน้ำอุ่นกับกลุ่มที่ดื่มน้ำอุณหภูมิห้อง..." class="w-full p-3 rounded-xl border-2 border-slate-900 dark:border-slate-300 dark:bg-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"></textarea>
+              </div>
+              <button onclick="finishGame()" class="w-full bg-emerald-500 hover:bg-emerald-400 text-white font-extrabold text-lg py-3.5 rounded-xl border-2 border-slate-900 neo-shadow btn-press transition-all flex items-center justify-center gap-2">
+                <span>ส่งแฟ้มคดีปิดคดี</span> <span>🎓</span>
+              </button>
+            </div>
+          `;
+        }
+
+        html += `</div>`;
+      }
+
+      app.innerHTML = html;
+    }
+
+    function startGame() {
+      AudioEngine.click();
+      const input = $("#nm");
+      const name = input ? input.value.trim() : "";
+      const playerName = name || "นักสืบนิรนาม";
+      
+      S = {
+        name: playerName,
+        score: 0,
+        ri: 0,
+        ii: 0,
+        ph: "intro",
+        done: 0,
+        hits: 0,
+        n: 0
+      };
+      savedName = playerName;
+      render();
+    }
+
+    function prepareQuestion() {
+      const item = cur();
+      S.sel = null;
+      S.fb = false;
+      S.op = new Set();
+      if (item && item.k === "mc") {
+        S.ord = shuffle(item.o.map((_, i) => i));
+      }
+    }
+
+    function beginRound() {
+      AudioEngine.click();
+      S.ph = "q";
+      prepareQuestion();
+      render();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function pickOption(idx) {
+      if (S.fb) return;
+      const item = cur();
+      S.sel = idx;
+      S.fb = true;
+      S.n++;
+      
+      S.ok = idx === item.a;
+      const fullPts = item.k === "src" ? 15 : (item.p || 10);
+      S.pts = S.ok ? fullPts : (item.k === "tf" && idx === 2 ? 3 : 0);
+      S.score += S.pts;
+      
+      if (S.ok) {
+        AudioEngine.correct();
+        S.hits++;
+      } else if (item.k === "tf" && idx === 2) {
+        AudioEngine.neutral();
+      } else {
+        AudioEngine.wrong();
+      }
+
+      render();
+    }
+
+    function openClue(idx) {
+      AudioEngine.click();
+      S.op.add(idx);
+      render();
+    }
+
+    function setScenario(key) {
+      AudioEngine.click();
+      S.sc = key;
+      ROUNDS[3].items.push(...SC[key][1].map(([q, o, a, e]) => ({ k: "mc", q, o, a, e, p: 15 })));
+      nextQuestion();
+    }
+
+    function nextQuestion() {
+      AudioEngine.click();
+      S.done++;
+      S.ii++;
+      
+      if (S.ii >= ROUNDS[S.ri].items.length) {
+        S.ri++;
+        S.ii = 0;
+        S.ph = S.ri >= ROUNDS.length ? "end" : "intro";
+      } else {
+        prepareQuestion();
+      }
+      
+      render();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function finishGame() {
+      AudioEngine.click();
+      const t1 = $("#t1") ? $("#t1").value.trim() : "";
+      const t2 = $("#t2") ? $("#t2").value.trim() : "";
+      
+      S.t1 = t1;
+      S.t2 = t2;
+      
+      if (t1.length >= 5 && t2.length >= 5) {
+        S.score += 15;
+      }
+      
+      S.done = TOTAL;
+      S.ph = "end";
+      S.ri = 5;
+
+      try {
+        localStorage.setItem("data_detective_game", JSON.stringify({ n: S.name, b: Math.max(best, S.score) }));
+      } catch (x) {}
+      
+      best = Math.max(best, S.score);
+      
+      AudioEngine.win();
+      if (window.confetti) {
+        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+      }
+
+      render();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function getRankTitle() {
+      const s = S.score;
+      if (s >= 210) return "หัวหน้านักสืบข้อมูลระดับสูง 🕵️‍♂️";
+      if (s >= 160) return "นักสืบมืออาชีพ 🔍";
+      if (s >= 100) return "นักสืบฝึกหัด 📝";
+      return "ผู้ช่วยนักสืบ 🐣";
+    }
+
+    function getSummaryCardText() {
+      return `[บัตรประจำตัวนักสืบข้อมูล]\nชื่อ: ${S.name}\nฉายา: ${getRankTitle()}\nคะแนนรวม: ${S.score} / 250\nตอบถูกต้อง: ${S.hits} จาก ${S.n} ข้อ\n------------------\nประเด็นที่สนใจ: ${S.t1 || "-"}\nข้อเสนอการพิสูจน์: ${S.t2 || "-"}`;
+    }
+
+    function renderEndView() {
+      return renderHeader().replace("สรุปผลคดี", "ภารกิจเสร็จสิ้น!") + `
+        <div class="bg-white dark:bg-slate-800 border-2 border-slate-900 dark:border-slate-200 rounded-2xl p-6 neo-shadow space-y-5 text-center">
+          <div class="inline-block bg-amber-400 text-slate-900 p-3 rounded-2xl border-2 border-slate-900 neo-shadow-sm text-3xl mb-1">
+            📜
+          </div>
+          <h2 class="text-2xl font-black text-slate-900 dark:text-white">ประกาศนียบัตรนักสืบ</h2>
+          
+          <div class="bg-amber-50 dark:bg-slate-900 border-2 border-slate-900 dark:border-slate-300 rounded-xl p-5 text-left space-y-3 relative overflow-hidden">
+            <div class="flex justify-between items-start">
+              <div>
+                <div class="text-xs font-extrabold text-slate-500 dark:text-slate-400 uppercase">นักสืบประจำคดี</div>
+                <div class="text-xl font-black text-slate-900 dark:text-amber-400">${escapeHtml(S.name)}</div>
+              </div>
+              <div class="text-right">
+                <div class="text-xs font-extrabold text-slate-500 dark:text-slate-400 uppercase">คะแนนรวม</div>
+                <div class="text-2xl font-black text-emerald-600 dark:text-emerald-400">${S.score} <span class="text-xs text-slate-500">/ 250</span></div>
+              </div>
+            </div>
+
+            <div class="border-t border-slate-300 dark:border-slate-700 pt-3">
+              <div class="text-xs font-bold text-slate-500 dark:text-slate-400">ตำแหน่งที่ได้รับ:</div>
+              <div class="text-lg font-black text-slate-800 dark:text-slate-100">${getRankTitle()}</div>
+            </div>
+
+            <div class="text-xs text-slate-600 dark:text-slate-400">
+              ความแม่นยำ: ตอบถูกต้อง <b class="text-slate-900 dark:text-white">${S.hits}</b> จาก ${S.n} ข้อที่ต้องวิเคราะห์
+            </div>
+
+            ${S.t1 ? `
+              <div class="bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-300 dark:border-slate-700 text-xs space-y-1">
+                <div class="font-bold text-slate-700 dark:text-slate-300">ประเด็นที่เสนอสืบสวน:</div>
+                <div class="text-slate-600 dark:text-slate-400 italic">“${escapeHtml(S.t1)}”</div>
+              </div>
+            ` : ''}
+
+            <div class="absolute -right-6 -bottom-6 opacity-20 text-7xl select-none pointer-events-none">
+              🕵️
+            </div>
+          </div>
+
+          <div class="space-y-2 pt-2">
+            <button onclick="copyCardText(this)" class="w-full bg-amber-400 hover:bg-amber-300 text-slate-900 font-extrabold text-base py-3 rounded-xl border-2 border-slate-900 neo-shadow btn-press transition-all flex items-center justify-center gap-2">
+              <span>📋 คัดลอกบัตรผลงานส่งครู</span>
+            </button>
+            <button onclick="resetGame()" class="w-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 font-bold text-sm py-2.5 rounded-xl border-2 border-slate-900 dark:border-slate-400 transition-all">
+              เล่นอีกครั้ง 🔄
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    function copyCardText(btn) {
+      AudioEngine.click();
+      const text = getSummaryCardText();
+      const resetBtnText = () => {
+        setTimeout(() => {
+          btn.querySelector('span').textContent = '📋 คัดลอกบัตรผลงานส่งครู';
+        }, 2500);
+      };
+
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(() => {
+            btn.querySelector('span').textContent = '✅ คัดลอกเรียบร้อยแล้ว!';
+            resetBtnText();
+          }, () => {
+            prompt("คัดลอกข้อความด้านล่างเพื่อส่งครู:", text);
+          });
+        } else {
+          prompt("คัดลอกข้อความด้านล่างเพื่อส่งครู:", text);
+        }
+      } catch (e) {
+        prompt("คัดลอกข้อความด้านล่างเพื่อส่งครู:", text);
+      }
+    }
+
+    function resetGame() {
+      AudioEngine.click();
+      ROUNDS[3].items = [{ k: "pick" }];
+      S = { ph: "name" };
+      render();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // Initial Execution
+    render();
+  </script>
+</body>
+</html>
